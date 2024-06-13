@@ -108,18 +108,23 @@ def greedy_allocation(demands, supplies, storage, E, C):
     alphas = np.ones(num_agents)
     graph = np.zeros((num_sources, num_agents), dtype=int)
     True_demands = demands.copy()
+    
     for source_idx, supply in enumerate(supplies):
-        subset_indices = np.random.choice(num_agents, size=num_agents, replace=True)
-        subset_demands = demands[subset_indices, :].copy()
-        graph[source_idx, subset_indices] = 1
+        for agent_idx in range(num_agents):
+            if np.random.rand() <= 0.5: 
+                graph[source_idx, agent_idx] = 1
+        subset_indices = np.where(graph[source_idx] == 1)[0] 
         
-        obj_value, alpha_values, allocation = Util_one(subset_demands, supply, storage, E, C)
-        if allocation is not None:
-            for agent_idx in range(num_agents):
-                for t in range(num_time_steps):
-                    allocation_value = allocation[agent_idx][t]
-                    total_allocation[agent_idx, source_idx, t] = allocation_value
-                    demands[agent_idx, t] = max(0, demands[agent_idx, t] - allocation_value)
+        if len(subset_indices) > 0:
+            subset_demands = demands[subset_indices, :].copy()
+            obj_value, alpha_values, allocation = Util_one(subset_demands, supply, storage, E, C)
+            
+            if allocation is not None:
+                for subset_agent_idx, original_agent_idx in enumerate(subset_indices):
+                    for t in range(num_time_steps):
+                        allocation_value = allocation[subset_agent_idx][t]
+                        total_allocation[original_agent_idx, source_idx, t] = allocation_value
+                        demands[original_agent_idx, t] = max(0, demands[original_agent_idx, t] - allocation_value)
     
     for agent_idx in range(num_agents):
         min_alpha_for_agent = min(
@@ -151,3 +156,4 @@ for storage in [0]:
                 if obj_util_optimal is not None:
                     approx.append((100-100*(obj_util_optimal - sum_alphas_greedy) / obj_util_optimal))
             results[(num_agents, num_agents1)] = approx
+averages = {key: sum(values) / len(values) for key, values in results.items()}
