@@ -109,6 +109,9 @@ def greedy_allocation(demands, supplies, storage, E, C):
     graph = np.zeros((num_sources, num_agents), dtype=int)
     True_demands = demands.copy()
     
+
+    demands_copy = demands.copy()
+    
     for source_idx, supply in enumerate(supplies):
         for agent_idx in range(num_agents):
             if np.random.rand() <= 0.5: 
@@ -116,7 +119,7 @@ def greedy_allocation(demands, supplies, storage, E, C):
         subset_indices = np.where(graph[source_idx] == 1)[0] 
         
         if len(subset_indices) > 0:
-            subset_demands = demands[subset_indices, :].copy()
+            subset_demands = demands_copy[subset_indices, :].copy()
             obj_value, alpha_values, allocation = Util_one(subset_demands, supply, storage, E, C)
             
             if allocation is not None:
@@ -124,7 +127,8 @@ def greedy_allocation(demands, supplies, storage, E, C):
                     for t in range(num_time_steps):
                         allocation_value = allocation[subset_agent_idx][t]
                         total_allocation[original_agent_idx, source_idx, t] = allocation_value
-                        demands[original_agent_idx, t] = max(0, demands[original_agent_idx, t] - allocation_value)
+                        demands_copy[subset_indices[subset_agent_idx], t] -= allocation_value
+                        demands_copy[subset_indices[subset_agent_idx], t] = max(0, demands_copy[subset_indices[subset_agent_idx], t])
     
     for agent_idx in range(num_agents):
         min_alpha_for_agent = min(
@@ -134,12 +138,11 @@ def greedy_allocation(demands, supplies, storage, E, C):
         alphas[agent_idx] = min(1, min_alpha_for_agent)
     
     return np.sum(alphas), graph
-
 num_time_steps = 1
 
 results = {}
 
-for storage in [0]:
+for storage in [0,float('inf'),100,200]:
     for num_agents in range(5, 30, 5):
         for num_agents1 in range(5, 30, 5):
             approx = []
@@ -147,13 +150,13 @@ for storage in [0]:
             for _ in range(10):
                 E = np.linspace(0.9, 1.0, 12)
                 C = storage * num_agents
-                demands = np.random.uniform(50, 100, size=(num_agents, num_time_steps))
+                demands = np.random.uniform(50, 101, size=(num_agents, num_time_steps))
                 for _ in range(num_agents1):
-                    supply = np.random.uniform(5, 20, size=num_time_steps)
+                    supply = np.random.uniform(50, 101, size=num_time_steps)
                     supplies.append(supply)
                 sum_alphas_greedy, graph = greedy_allocation(demands, supplies, storage, E, C)
                 obj_util_optimal, alpha_values_optimal, allocation_optimal = Util_many(demands, supplies, storage, E, C, graph)
                 if obj_util_optimal is not None:
                     approx.append((100-100*(obj_util_optimal - sum_alphas_greedy) / obj_util_optimal))
-            results[(num_agents, num_agents1)] = approx
+            results[(storage,num_agents, num_agents1)] = approx
 averages = {key: sum(values) / len(values) for key, values in results.items()}
